@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #737373;
+  --color-border: #e5e5e5;
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-accent: #f5f5f5;
+  --color-accent-foreground: #171717;
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+  --color-sidebar: #fafafa;
+  --color-sidebar-foreground: #0a0a0a;
+  --color-sidebar-border: #e5e5e5;
+
+  --color-stage-lead: #6366f1;
+  --color-stage-qualified: #8b5cf6;
+  --color-stage-proposal: #f59e0b;
+  --color-stage-negotiation: #f97316;
+  --color-stage-won: #22c55e;
+  --color-stage-lost: #ef4444;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}

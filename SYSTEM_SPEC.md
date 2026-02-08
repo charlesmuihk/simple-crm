@@ -140,84 +140,88 @@ A system user (agent, manager, or admin).
 ### 5.6 Search
 - Global search across contacts, companies, and deals
 
-## 6. API Design
+## 6. Data Access & API Design
 
-RESTful JSON API. All endpoints require authentication via JWT.
+Data access is handled directly via the Supabase client (`@supabase/supabase-js`). No custom REST API is needed — the frontend communicates with Supabase's auto-generated PostgREST API and Auth endpoints.
 
 ### Authentication
-| Method | Endpoint          | Description        |
-|--------|-------------------|--------------------|
-| POST   | /api/auth/login   | Login, returns JWT |
-| POST   | /api/auth/logout  | Invalidate token   |
 
-### Contacts
-| Method | Endpoint              | Description          |
-|--------|-----------------------|----------------------|
-| GET    | /api/contacts         | List (paginated)     |
-| POST   | /api/contacts         | Create               |
-| GET    | /api/contacts/:id     | Get by ID            |
-| PUT    | /api/contacts/:id     | Update               |
-| DELETE | /api/contacts/:id     | Delete               |
+Supabase Auth handles user management, login, and session tokens.
 
-### Companies
-| Method | Endpoint              | Description          |
-|--------|-----------------------|----------------------|
-| GET    | /api/companies        | List (paginated)     |
-| POST   | /api/companies        | Create               |
-| GET    | /api/companies/:id    | Get by ID            |
-| PUT    | /api/companies/:id    | Update               |
-| DELETE | /api/companies/:id    | Delete               |
+| Operation       | Method                                      |
+|-----------------|---------------------------------------------|
+| Sign up         | `supabase.auth.signUp({ email, password })` |
+| Sign in         | `supabase.auth.signInWithPassword({ email, password })` |
+| Sign out        | `supabase.auth.signOut()`                   |
+| Get session     | `supabase.auth.getSession()`                |
+| Get current user| `supabase.auth.getUser()`                   |
 
-### Deals
-| Method | Endpoint              | Description          |
-|--------|-----------------------|----------------------|
-| GET    | /api/deals            | List (paginated)     |
-| POST   | /api/deals            | Create               |
-| GET    | /api/deals/:id        | Get by ID            |
-| PUT    | /api/deals/:id        | Update               |
-| PATCH  | /api/deals/:id/stage  | Move to a new stage  |
-| DELETE | /api/deals/:id        | Delete               |
+### Data Operations
 
-### Activities
-| Method | Endpoint              | Description          |
-|--------|-----------------------|----------------------|
-| GET    | /api/activities       | List (paginated)     |
-| POST   | /api/activities       | Create               |
-| GET    | /api/activities/:id   | Get by ID            |
-| PUT    | /api/activities/:id   | Update               |
-| DELETE | /api/activities/:id   | Delete               |
+All CRUD operations use the Supabase client query builder:
 
-### Users (Admin only)
-| Method | Endpoint              | Description          |
-|--------|-----------------------|----------------------|
-| GET    | /api/users            | List                 |
-| POST   | /api/users            | Create               |
-| GET    | /api/users/:id        | Get by ID            |
-| PUT    | /api/users/:id        | Update               |
+```typescript
+// List with pagination and filtering
+const { data, error } = await supabase
+  .from('contacts')
+  .select('*, company:companies(name)')
+  .order('created_at', { ascending: false })
+  .range(0, 24)
 
-### Dashboard
-| Method | Endpoint              | Description              |
-|--------|-----------------------|--------------------------|
-| GET    | /api/dashboard        | Summary stats and feed   |
+// Get by ID
+const { data, error } = await supabase
+  .from('contacts')
+  .select('*, company:companies(*), activities(*)')
+  .eq('id', contactId)
+  .single()
 
-### Pagination & Filtering
+// Create
+const { data, error } = await supabase
+  .from('contacts')
+  .insert({ first_name, last_name, email, ... })
+  .select()
+  .single()
 
-All list endpoints support:
-- `page` and `per_page` query params (default: page=1, per_page=25)
-- `sort` and `order` (e.g., `?sort=created_at&order=desc`)
-- Entity-specific filters (e.g., `?stage=proposal&owner_id=<uuid>`)
-- `q` for text search
+// Update
+const { data, error } = await supabase
+  .from('contacts')
+  .update({ first_name, last_name, ... })
+  .eq('id', contactId)
+  .select()
+  .single()
+
+// Delete
+const { error } = await supabase
+  .from('contacts')
+  .delete()
+  .eq('id', contactId)
+```
+
+### Row Level Security
+
+Supabase RLS policies enforce role-based access at the database level:
+- **Agents** can only read/write their own contacts, deals, and activities (`owner_id = auth.uid()`)
+- **Managers** can read all data, reassign deals
+- **Admins** have full access to all data and user management
+
+### Filtering & Search
+
+Queries use the Supabase client's filter methods:
+- `.eq()`, `.neq()`, `.in()` for exact matches
+- `.ilike()` for text search (e.g., `q` parameter)
+- `.order()` for sorting
+- `.range()` for pagination
 
 ## 7. Tech Stack
 
 | Layer      | Technology                        |
 |------------|-----------------------------------|
-| Frontend   | React with TypeScript             |
-| UI Library | Tailwind CSS                      |
-| Backend    | Node.js with Express              |
-| Database   | PostgreSQL                        |
-| ORM        | Prisma                            |
-| Auth       | JWT (access + refresh tokens)     |
+| Frontend   | Next.js 15 (App Router) with TypeScript |
+| UI Library | shadcn/ui + Tailwind CSS          |
+| Backend    | Supabase (hosted BaaS)            |
+| Database   | Supabase PostgreSQL               |
+| DB Client  | @supabase/supabase-js             |
+| Auth       | Supabase Auth                     |
 | Validation | Zod (shared schemas)              |
 | Testing    | Vitest (unit), Playwright (e2e)   |
 
@@ -236,24 +240,43 @@ All list endpoints support:
 
 ```
 simple-crm/
-├── frontend/            # React app
-│   ├── src/
-│   │   ├── components/  # Reusable UI components
-│   │   ├── pages/       # Route-level page components
-│   │   ├── hooks/       # Custom React hooks
-│   │   ├── services/    # API client functions
-│   │   ├── types/       # TypeScript type definitions
-│   │   └── utils/       # Helper functions
-│   └── ...
-├── backend/             # Express API
-│   ├── src/
-│   │   ├── routes/      # Route handlers
-│   │   ├── middleware/   # Auth, validation, error handling
-│   │   ├── services/    # Business logic
-│   │   └── utils/       # Helper functions
-│   ├── prisma/
-│   │   └── schema.prisma
-│   └── ...
+├── frontend/                    # Next.js 15 App Router
+│   ├── app/
+│   │   ├── layout.tsx           # Root layout with sidebar nav
+│   │   ├── page.tsx             # Dashboard
+│   │   ├── contacts/
+│   │   │   ├── page.tsx         # Contact list
+│   │   │   ├── new/page.tsx     # Create contact
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx     # Contact detail
+│   │   │       └── edit/page.tsx# Edit contact
+│   │   ├── companies/
+│   │   │   ├── page.tsx         # Company list
+│   │   │   ├── new/page.tsx     # Create company
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx     # Company detail
+│   │   │       └── edit/page.tsx# Edit company
+│   │   ├── deals/
+│   │   │   ├── page.tsx         # Deal list / pipeline view
+│   │   │   ├── new/page.tsx     # Create deal
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx     # Deal detail
+│   │   │       └── edit/page.tsx# Edit deal
+│   │   └── activities/
+│   │       ├── page.tsx         # Activity list
+│   │       └── new/page.tsx     # Create activity
+│   ├── components/              # Shared UI components
+│   │   ├── ui/                  # shadcn/ui primitives
+│   │   ├── sidebar.tsx          # Sidebar navigation
+│   │   ├── data-table.tsx       # Reusable data table
+│   │   └── ...
+│   ├── lib/
+│   │   ├── supabase.ts          # Supabase client
+│   │   ├── types.ts             # TypeScript types (DB schema)
+│   │   └── utils.ts             # Helper functions
+│   ├── tailwind.config.ts
+│   ├── next.config.ts
+│   └── package.json
 └── SYSTEM_SPEC.md
 ```
 
