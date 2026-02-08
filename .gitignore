@@ -21,6 +21,10 @@ ENV/
 .env
 .env.local
 
+# Node / Next.js
+node_modules/
+frontend/.next/
+
 # Distribution
 dist/
 build/
